@@ -1,19 +1,18 @@
 ﻿Set-StrictMode -Version Latest
 
 <#
-    Fachada de acceso a datos + Registro de estrategias (patrones Strategy / Registry / Facade).
+    Fachada de acceso a datos + Registro de estrategias (Strategy / Registry / Facade).
 
     Cada proveedor (formato de archivo) se registra con tres operaciones:
       Read   { param($Path, $Sheet)           -> @{ Table = <DataTable>; Meta = <hashtable> } }
       Save   { param($Source, $Table)         -> sobrescribe el archivo de origen }
       Create { param($Path, $Table, $Options) -> crea un archivo nuevo con el contenido de la tabla }
 
-    La UI sólo conoce esta fachada (Dependency Inversion): no sabe nada de OpenXML ni de delimitadores.
+    La aplicación sólo conoce esta fachada (Dependency Inversion).
 #>
 
 $script:Providers = New-Object System.Collections.Generic.List[object]
 
-#region Registro de proveedores
 function Register-AbmProvider {
     [CmdletBinding()]
     param(
@@ -61,35 +60,23 @@ function Get-AbmFileFilter {
     }
     return ($parts -join '|')
 }
-#endregion
 
-#region Fachada
 function Open-AbmSource {
     [CmdletBinding()]
-    param(
-        [Parameter(Mandatory)][string]$Path,
-        [string]$Sheet
-    )
+    param([Parameter(Mandatory)][string]$Path, [string]$Sheet)
 
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { throw "No existe el archivo: $Path" }
     $fullPath = (Resolve-Path -LiteralPath $Path).ProviderPath
     $provider = Get-AbmProvider -Path $fullPath
     $result   = & $provider.Read $fullPath $Sheet
 
-    [pscustomobject]@{
-        Path  = $fullPath
-        Kind  = $provider.Kind
-        Meta  = $result.Meta
-        Table = $result.Table
-    }
+    [pscustomobject]@{ Path = $fullPath; Kind = $provider.Kind; Meta = $result.Meta; Table = $result.Table }
 }
 
 function Save-AbmSource {
     [CmdletBinding()]
-    param(
-        [Parameter(Mandatory)]$Source,
-        [Parameter(Mandatory)][System.Data.DataTable]$Table
-    )
+    param([Parameter(Mandatory)]$Source, [Parameter(Mandatory)][System.Data.DataTable]$Table)
+
     $provider = Get-AbmProvider -Path $Source.Path
     $null = & $provider.Save $Source $Table
 }
@@ -104,35 +91,5 @@ function New-AbmSource {
     $provider = Get-AbmProvider -Path $Path
     $null = & $provider.Create $Path $Table $Options
 }
-#endregion
 
-#region Utilidades de tabla (compartidas por todos los proveedores)
-function Get-AbmUniqueNames {
-    [CmdletBinding()]
-    param([AllowEmptyString()][AllowEmptyCollection()][string[]]$Names)
-
-    $seen   = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
-    $result = New-Object System.Collections.Generic.List[string]
-    for ($i = 0; $i -lt $Names.Count; $i++) {
-        $base = if ([string]::IsNullOrWhiteSpace($Names[$i])) { "Columna $($i + 1)" } else { $Names[$i].Trim() }
-        $name = $base
-        $suffix = 2
-        while (-not $seen.Add($name)) { $name = "$base ($suffix)"; $suffix++ }
-        $result.Add($name)
-    }
-    return ,$result.ToArray()
-}
-
-function New-AbmDataTable {
-    [CmdletBinding()]
-    param([Parameter(Mandatory)][AllowEmptyString()][string[]]$Columns)
-
-    $table = New-Object System.Data.DataTable 'Datos'
-    foreach ($name in (Get-AbmUniqueNames -Names $Columns)) { [void]$table.Columns.Add($name, [string]) }
-    return ,$table
-}
-#endregion
-
-Export-ModuleMember -Function Register-AbmProvider, Get-AbmProvider, Get-AbmFileFilter,
-                              Open-AbmSource, Save-AbmSource, New-AbmSource,
-                              Get-AbmUniqueNames, New-AbmDataTable
+Export-ModuleMember -Function Register-AbmProvider, Get-AbmProvider, Get-AbmFileFilter, Open-AbmSource, Save-AbmSource, New-AbmSource

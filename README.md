@@ -122,49 +122,93 @@ Ejemplo de línea de auditoría:
 
 ## 🏗️ Arquitectura
 
-El proyecto está modularizado en archivos `.psm1` con una única responsabilidad cada uno, y aplica principios **SOLID** y patrones de diseño.
+El código está organizado **en capas, una carpeta por capa**, con **un módulo `.psm1` por responsabilidad** (ninguno supera las ~190 líneas). Aplica principios **SOLID**, patrones de diseño y prácticas de **clean code**: funciones cortas, nombres descriptivos, sin valores mágicos y sin estado global fuera del contexto de la aplicación.
 
 ```
 lector_excel/
-├── ABM.ps1                     # Punto de entrada y composición (registro de proveedores)
-├── config.json                 # Configuración opcional
-└── Modules/
-    ├── ABM.Config.psm1         # Carga de configuración con valores por defecto
-    ├── ABM.Logger.psm1         # Auditoría en .txt y respaldos con rotación
-    ├── ABM.DataSource.psm1     # Fachada de datos + registro de estrategias
-    ├── ABM.ExcelProvider.psm1  # Estrategia Excel (OpenXML nativo)
-    ├── ABM.TextProvider.psm1   # Estrategia TXT (delimitadores, comillas, codificación)
-    ├── ABM.Theme.psm1          # Paleta, tipografías, escala DPI y componentes visuales
-    ├── ABM.Dialogs.psm1        # Diálogos modales (alta/modificación, nuevo archivo, mensajes)
-    └── ABM.MainForm.psm1       # Pantalla principal: vista + controlador de acciones
+├── ABM.ps1                         # Punto de entrada: carga módulos, configura y arranca (Composition Root)
+├── config.json                     # Configuración opcional
+├── Core/                           # Transversal
+│   ├── ABM.Config.psm1             #   Configuración con valores por defecto
+│   └── ABM.Logger.psm1             #   Auditoría en .txt y respaldos con rotación
+├── Data/                           # Modelo y acceso a datos
+│   ├── ABM.DataTable.psm1          #   Tabla en memoria, nombres únicos, registro <-> texto
+│   └── ABM.DataSource.psm1         #   Fachada + registro de estrategias
+├── Providers/                      # Estrategias por formato de archivo
+│   ├── ABM.ProviderSetup.psm1      #   Registro de los formatos incluidos
+│   ├── Text/
+│   │   ├── ABM.TextEncoding.psm1   #     Detección de codificación (BOM, UTF-8, ANSI)
+│   │   ├── ABM.DelimitedText.psm1  #     Delimitador, comillas y escape de campos
+│   │   └── ABM.TextProvider.psm1   #     Estrategia .txt
+│   └── Excel/
+│       ├── ABM.OpenXmlPackage.psm1 #     ZIP, partes XML, relaciones y estructura del libro
+│       ├── ABM.CellAddress.psm1    #     Letras de columna <-> índice
+│       ├── ABM.CellValue.psm1      #     Números, fechas y booleanos (lectura y escritura)
+│       ├── ABM.ExcelStyles.psm1    #     Estilos con formato de fecha
+│       ├── ABM.ExcelReader.psm1    #     Hoja -> tabla (detección de encabezado)
+│       ├── ABM.ExcelWriter.psm1    #     Tabla -> hoja (conservando estilos por columna)
+│       ├── ABM.ExcelMaintenance.psm1 #   Rangos, tabla de Excel y cadena de cálculo
+│       ├── ABM.ExcelTemplate.psm1  #     Libro nuevo con estilo corporativo
+│       └── ABM.ExcelProvider.psm1  #     Estrategia .xlsx / .xlsm (orquesta lo anterior)
+├── UI/                             # Componentes visuales reutilizables
+│   ├── ABM.Theme.psm1              #   Paleta, tipografías y escala DPI
+│   ├── ABM.Controls.psm1           #   Fábrica de paneles, etiquetas y botones
+│   ├── ABM.KpiCard.psm1            #   Tarjeta de indicador
+│   ├── ABM.GridStyle.psm1          #   Estilo de la grilla
+│   └── Dialogs/
+│       ├── ABM.Messages.psm1       #     Mensajes y confirmaciones
+│       ├── ABM.DialogShell.psm1    #     Armazón común de diálogos
+│       ├── ABM.RecordDialog.psm1   #     Alta / modificación
+│       └── ABM.NewFileDialog.psm1  #     Nuevo archivo
+├── App/                            # Aplicación
+│   ├── ABM.AppContext.psm1         #   Estado de la sesión y registro de controles
+│   ├── ABM.Session.psm1            #   Transiciones de estado y consultas
+│   ├── ABM.ViewUpdater.psm1        #   Refresco de la vista a partir del estado
+│   ├── ABM.SearchFilter.psm1       #   Búsqueda sobre todas las columnas
+│   ├── ABM.Shortcuts.psm1          #   Atajos de teclado definidos como datos
+│   ├── ABM.Events.psm1             #   Conexión de eventos con comandos
+│   ├── ABM.MainForm.psm1           #   Ventana principal (sólo composición)
+│   ├── Views/                      #   Encabezado, barra de acciones, indicadores, grilla y estado
+│   └── Commands/                   #   Comandos de archivo, de guardado y de registros (ABM)
+└── Tests/
+    └── Test-Providers.ps1          # Pruebas automáticas de la capa de datos
 ```
 
 ```mermaid
-flowchart LR
-    UI["ABM.MainForm<br/>(vista + controlador)"] --> DLG["ABM.Dialogs"]
-    UI --> THEME["ABM.Theme"]
-    UI --> LOG["ABM.Logger"]
-    UI --> DS["ABM.DataSource<br/>(Facade + Registry)"]
-    DS -->|Strategy| XL["ABM.ExcelProvider<br/>.xlsx / .xlsm"]
-    DS -->|Strategy| TXT["ABM.TextProvider<br/>.txt"]
-    ENTRY["ABM.ps1<br/>(composición)"] -.registra.-> DS
-    ENTRY --> UI
+flowchart TB
+    ENTRY["ABM.ps1<br/>(Composition Root)"] --> APP
+    subgraph APP["App"]
+        direction LR
+        EV["Events / Shortcuts"] --> CMD["Commands<br/>File · Save · Record"]
+        CMD --> SES["Session / Context"]
+        SES --> VU["ViewUpdater"]
+        VU --> VIEWS["Views"]
+    end
+    APP --> UI["UI<br/>Theme · Controls · Dialogs"]
+    CMD --> CORE["Core<br/>Config · Logger"]
+    CMD --> DS["Data<br/>DataSource (Facade + Registry)"]
+    DS -->|Strategy| TXT["Providers/Text"]
+    DS -->|Strategy| XL["Providers/Excel<br/>(OpenXML nativo)"]
 ```
 
 ### Patrones y principios aplicados
 
 | Patrón / principio | Dónde se aplica |
 |--------------------|-----------------|
-| **Strategy**       | Cada formato de archivo implementa `Read`, `Save` y `Create`. |
+| **Strategy**       | Cada formato de archivo implementa `Read`, `Save` y `Create` (`Providers/`). |
 | **Registry**       | `Register-AbmProvider` asocia extensiones con estrategias. |
-| **Facade**         | `Open-AbmSource`, `Save-AbmSource` y `New-AbmSource`: la UI no conoce OpenXML ni delimitadores. |
-| **Composition Root** | `ABM.ps1` es el único lugar donde se conectan las piezas. |
-| **Template Method** | Todos los diálogos comparten el mismo armazón (`New-AbmDialogShell`). |
-| **Single Responsibility** | Un módulo por responsabilidad: configuración, logging, datos, formato, tema, diálogos, pantalla. |
-| **Open/Closed**    | Para soportar un formato nuevo alcanza con registrar otro proveedor, sin tocar la UI. |
-| **Dependency Inversion** | La pantalla depende de la fachada, no de las implementaciones concretas. |
+| **Facade**         | `Open-AbmSource`, `Save-AbmSource` y `New-AbmSource`: la aplicación no conoce OpenXML ni delimitadores. |
+| **Composition Root** | `ABM.ps1` es el único lugar donde se cargan y conectan las piezas. |
+| **Command**        | Atajos de teclado definidos como datos (tecla + condición + acción) en `ABM.Shortcuts`. |
+| **Template Method** | Todos los diálogos comparten el armazón de `ABM.DialogShell`. |
+| **Factory**        | `ABM.Controls` crea controles ya estilizados según el tema. |
+| **Single Responsibility** | Un módulo por responsabilidad; la ventana principal sólo compone vistas. |
+| **Open/Closed**    | Formato nuevo = un proveedor más; botón o atajo nuevo = una línea en su tabla de datos. |
+| **Dependency Inversion** | La aplicación depende de la fachada de datos, no de las implementaciones concretas. |
 
 ### Agregar un formato nuevo
+
+Se registra en `Providers/ABM.ProviderSetup.psm1`:
 
 ```powershell
 Register-AbmProvider -Kind 'Csv' -Description 'Valores separados por comas' -Extensions '.csv' `
@@ -172,6 +216,18 @@ Register-AbmProvider -Kind 'Csv' -Description 'Valores separados por comas' -Ext
     -Save   { param($Source, $Table)             <# sobrescribir $Source.Path #> } `
     -Create { param($FilePath, $Table, $Options) <# crear un archivo nuevo #> }
 ```
+
+---
+
+## 🧪 Pruebas
+
+La capa de datos tiene pruebas automáticas que **no requieren Pester ni ningún módulo**:
+
+```powershell
+.\Tests\Test-Providers.ps1
+```
+
+Crean archivos temporales y verifican lectura, alta, modificación, baja y guardado en Excel y TXT, la conversión entre formatos, la detección de codificación y delimitador, y el manejo de comillas, ceros a la izquierda y decimales. Devuelven código de salida `0` si todo pasó.
 
 ---
 
