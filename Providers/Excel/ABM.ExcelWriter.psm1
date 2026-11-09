@@ -1,59 +1,110 @@
 ﻿Set-StrictMode -Version Latest
 
 <#
-    Escritura de la tabla en el XML de una hoja: quita las filas viejas (desde el encabezado),
-    recuerda el estilo de cada columna y escribe encabezado + registros con esos estilos.
+    Escritura de la tabla en una hoja, optimizada para archivos grandes:
+      1. Reset-AbmSheetData: conserva las filas por encima del encabezado, recuerda el estilo de cada
+         columna y deja una marca donde irán las filas nuevas (sin recorrer toda la hoja).
+      2. ConvertTo-AbmSheetRowsXml: genera el XML de encabezado + registros en un StringBuilder,
+         en un bucle sin llamadas a funciones por celda.
+      3. Complete-AbmSheetXml: reemplaza la marca por las filas y devuelve el XML final de la hoja.
 #>
 
-$script:Ns = Get-AbmSpreadsheetNamespace
+$script:Ns     = Get-AbmSpreadsheetNamespace
+$script:Codec  = Get-AbmCellCodec
+$script:Marker = 'ABM:ROWS'
 $script:InvalidXmlChars = New-Object System.Text.RegularExpressions.Regex('[\x00-\x08\x0B\x0C\x0E-\x1F]')
+$script:InvalidCharSet  = [char[]](@(0..8) + @(11, 12) + @(14..31))
 
-function Remove-AbmTableRows {
-    <# Quita las filas desde $HeaderRow hacia abajo y devuelve @{ Header = @{col=estilo}; Data = @{col=estilo} }. #>
+function Reset-AbmSheetData {
+    <# Devuelve @{ Header = @{col=estilo}; Data = @{col=estilo} } y deja la marca en sheetData. #>
     [CmdletBinding()]
     param([Parameter(Mandatory)][System.Xml.XmlElement]$SheetData, [Parameter(Mandatory)]$Ns, [int]$HeaderRow)
 
-    $styles   = @{ Header = @{}; Data = @{} }
-    $obsolete = New-Object System.Collections.Generic.List[System.Xml.XmlNode]
+    $styles = @{ Header = @{}; Data = @{} }
+    $kept   = New-Object System.Collections.Generic.List[System.Xml.XmlNode]
     $rowNumber = 0
-    foreach ($row in @($SheetData.SelectNodes('x:row', $Ns))) {
+    foreach ($row in $SheetData.SelectNodes('x:row', $Ns)) {
         $rowNumber = Get-AbmRowNumber -Row $row -Previous $rowNumber
-        if ($rowNumber -lt $HeaderRow) { continue }
-        $obsolete.Add($row)
-        if ($rowNumber -eq $HeaderRow)         { Read-ColumnStyles -Row $row -Ns $Ns -Target $styles.Header }
-        elseif ($rowNumber -eq $HeaderRow + 1) { Read-ColumnStyles -Row $row -Ns $Ns -Target $styles.Data }
+        if ($rowNumber -lt $HeaderRow) { $kept.Add($row); continue }
+        if ($rowNumber -eq $HeaderRow)     { Read-ColumnStyles -Row $row -Ns $Ns -Target $styles.Header; continue }
+        if ($rowNumber -eq $HeaderRow + 1) { Read-ColumnStyles -Row $row -Ns $Ns -Target $styles.Data }
+        break
     }
-    foreach ($node in $obsolete) { [void]$SheetData.RemoveChild($node) }
+
+    $SheetData.RemoveAll()
+    foreach ($row in $kept) { [void]$SheetData.AppendChild($row) }
+    [void]$SheetData.AppendChild($SheetData.OwnerDocument.CreateComment($script:Marker))
     return $styles
 }
 
-function Write-AbmTableRows {
-    <# Escribe encabezado + registros. Devuelve el número de la última fila escrita. #>
+function ConvertTo-AbmSheetRowsXml {
+    <# Devuelve @{ Xml = <filas>; LastRow = <número de la última fila escrita> }. #>
     [CmdletBinding()]
-    [OutputType([int])]
     param(
-        [Parameter(Mandatory)][System.Xml.XmlElement]$SheetData,
         [Parameter(Mandatory)][System.Data.DataTable]$Table,
-        [int]$HeaderRow, [int]$ColOffset,
+        [int]$HeaderRow, [int]$ColOffset, [AllowEmptyString()][string]$Prefix = '',
         [Parameter(Mandatory)][hashtable]$Styles, [Parameter(Mandatory)]$DateStyles,
         [string]$DefaultHeaderStyle = '', [string]$DefaultDataStyle = ''
     )
 
     $layout  = Get-ColumnLayout -Table $Table -ColOffset $ColOffset -Styles $Styles -DateStyles $DateStyles `
                                 -DefaultHeaderStyle $DefaultHeaderStyle -DefaultDataStyle $DefaultDataStyle
-    $context = @{ Document = $SheetData.OwnerDocument; Prefix = $SheetData.Prefix }
+    $tags    = Get-Tags -Prefix $Prefix
+    $builder = New-Object System.Text.StringBuilder (1MB)
+    $codec   = $script:Codec
+    $invalid = $script:InvalidCharSet
+    $count   = $layout.Count
+    $number  = 0.0
+    $date    = [datetime]::MinValue
 
     $rowNumber = $HeaderRow
-    $names = @(foreach ($column in $Table.Columns) { $column.ColumnName })
-    [void]$SheetData.AppendChild((New-RowElement -Context $context -Number $rowNumber -Values $names -Layout $layout -IsHeader))
+    [void]$builder.Append($tags.RowOpen + $rowNumber + '">')
+    for ($i = 0; $i -lt $count; $i++) {
+        $column = $layout[$i]
+        $text = [System.Security.SecurityElement]::Escape($script:InvalidXmlChars.Replace($Table.Columns[$i].ColumnName, ''))
+        [void]$builder.Append($tags.CellOpen + $column.Letters + $rowNumber + $column.HeaderAttr + ' t="inlineStr">' + $tags.InlineOpen + $text + $tags.InlineClose)
+    }
+    [void]$builder.Append($tags.RowClose)
 
     foreach ($dataRow in $Table.Rows) {
         if ($dataRow.RowState -eq [System.Data.DataRowState]::Deleted) { continue }
         $rowNumber++
-        $values = @(for ($i = 0; $i -lt $Table.Columns.Count; $i++) { [string]$dataRow[$i] })
-        [void]$SheetData.AppendChild((New-RowElement -Context $context -Number $rowNumber -Values $values -Layout $layout))
+        $items = $dataRow.ItemArray
+        [void]$builder.Append($tags.RowOpen + $rowNumber + '">')
+        for ($i = 0; $i -lt $count; $i++) {
+            $column = $layout[$i]
+            $value  = [string]$items[$i]
+            if ($value.IndexOfAny($invalid) -ge 0) { $value = $script:InvalidXmlChars.Replace($value, '') }
+            $open = $tags.CellOpen + $column.Letters + $rowNumber + $column.DataAttr
+
+            if ($value.Length -eq 0) { if ($column.DataAttr.Length -gt 1) { [void]$builder.Append($open + '/>') }; continue }
+
+            # Misma regla que ConvertTo-AbmCellNumber / ConvertTo-AbmStoredBoolean, sin llamar funciones por celda.
+            if ($codec.NumberPattern.IsMatch($value) -and [double]::TryParse($value, [System.Globalization.NumberStyles]::Float, $codec.Culture, [ref]$number)) {
+                [void]$builder.Append($open + '>' + $tags.ValueOpen + $number.ToString('R', $codec.Culture) + $tags.ValueClose)
+            }
+            elseif ($column.IsDate -and [datetime]::TryParseExact($value, $codec.DateFormats, $codec.Culture, [System.Globalization.DateTimeStyles]::None, [ref]$date)) {
+                [void]$builder.Append($open + '>' + $tags.ValueOpen + $date.ToOADate().ToString('R', $codec.Culture) + $tags.ValueClose)
+            }
+            elseif ($value -ceq $codec.TrueText -or $value -ceq $codec.FalseText) {
+                $flag = if ($value -ceq $codec.TrueText) { '1' } else { '0' }
+                [void]$builder.Append($open + ' t="b">' + $tags.ValueOpen + $flag + $tags.ValueClose)
+            }
+            else {
+                $space = if ($value.Length -ne $value.Trim().Length) { ' xml:space="preserve"' } else { '' }
+                [void]$builder.Append($open + ' t="inlineStr">' + $tags.IsOpen + $tags.TOpen + $space + '>' + [System.Security.SecurityElement]::Escape($value) + $tags.InlineClose)
+            }
+        }
+        [void]$builder.Append($tags.RowClose)
     }
-    return $rowNumber
+    return @{ Xml = $builder.ToString(); LastRow = $rowNumber }
+}
+
+function Complete-AbmSheetXml {
+    [CmdletBinding()]
+    [OutputType([string])]
+    param([Parameter(Mandatory)][System.Xml.XmlDocument]$Document, [Parameter(Mandatory)][AllowEmptyString()][string]$RowsXml)
+    return $Document.OuterXml.Replace("<!--$($script:Marker)-->", $RowsXml)
 }
 
 #region Internos
@@ -68,79 +119,46 @@ function Read-ColumnStyles {
 }
 
 function Get-ColumnLayout {
-    <# Precalcula por columna: letra, estilo de encabezado, estilo de datos y si es columna de fecha. #>
+    <# Precalcula por columna: letras, atributo de estilo del encabezado y de los datos, y si es fecha. #>
     param($Table, [int]$ColOffset, [hashtable]$Styles, $DateStyles, [string]$DefaultHeaderStyle, [string]$DefaultDataStyle)
 
     $layout = New-Object System.Collections.Generic.List[object]
     for ($i = 0; $i -lt $Table.Columns.Count; $i++) {
         $column = $ColOffset + $i
+        $header = if ($Styles.Header.ContainsKey($column)) { $Styles.Header[$column] } else { $DefaultHeaderStyle }
         $data   = if ($Styles.Data.ContainsKey($column)) { $Styles.Data[$column] } else { $DefaultDataStyle }
         $layout.Add([pscustomobject]@{
-            Letters     = ConvertTo-AbmColumnLetters $column
-            HeaderStyle = if ($Styles.Header.ContainsKey($column)) { $Styles.Header[$column] } else { $DefaultHeaderStyle }
-            DataStyle   = $data
-            IsDate      = ($data -ne '') -and $DateStyles.Contains([int]$data)
+            Letters    = ConvertTo-AbmColumnLetters $column
+            HeaderAttr = Get-StyleAttribute $header
+            DataAttr   = Get-StyleAttribute $data
+            IsDate     = ($data -ne '') -and $DateStyles.Contains([int]$data)
         })
     }
     return ,$layout.ToArray()
 }
 
-function New-RowElement {
-    param([hashtable]$Context, [int]$Number, [string[]]$Values, [object[]]$Layout, [switch]$IsHeader)
+function Get-StyleAttribute {
+    <# Cierra el atributo r="…" y agrega s="…" si hay estilo. #>
+    param([string]$Style)
+    if ($Style) { return '" s="' + $Style + '"' }
+    return '"'
+}
 
-    $row = New-XmlElement -Context $Context -Name 'row'
-    $row.SetAttribute('r', [string]$Number)
-    for ($i = 0; $i -lt $Layout.Count; $i++) {
-        $column = $Layout[$i]
-        $style  = if ($IsHeader) { $column.HeaderStyle } else { $column.DataStyle }
-        $cell   = New-CellElement -Context $Context -Reference ($column.Letters + $Number) -Value $Values[$i] `
-                                  -Style $style -AsText:$IsHeader -IsDateColumn:($column.IsDate)
-        if ($null -ne $cell) { [void]$row.AppendChild($cell) }
+function Get-Tags {
+    param([string]$Prefix)
+    $p = if ($Prefix) { "$Prefix`:" } else { '' }
+    return [pscustomobject]@{
+        RowOpen     = "<${p}row r=`""
+        RowClose    = "</${p}row>"
+        CellOpen    = "<${p}c r=`""
+        ValueOpen   = "<${p}v>"
+        ValueClose  = "</${p}v></${p}c>"
+        IsOpen      = "<${p}is>"
+        TOpen       = "<${p}t"
+        InlineOpen  = "<${p}is><${p}t>"
+        InlineClose = "</${p}t></${p}is></${p}c>"
     }
-    return ,$row
-}
-
-function New-CellElement {
-    param([hashtable]$Context, [string]$Reference, [string]$Value, [string]$Style, [switch]$AsText, [switch]$IsDateColumn)
-
-    $Value = $script:InvalidXmlChars.Replace($Value, '')
-    if ($Value -eq '' -and -not $Style) { return $null }
-
-    $cell = New-XmlElement -Context $Context -Name 'c'
-    $cell.SetAttribute('r', $Reference)
-    if ($Style) { $cell.SetAttribute('s', $Style) }
-    if ($Value -eq '') { return ,$cell }
-
-    $number  = if ($AsText) { $null } else { ConvertTo-AbmCellNumber -Value $Value -IsDateColumn:$IsDateColumn }
-    $boolean = if ($AsText) { $null } else { ConvertTo-AbmStoredBoolean -Value $Value }
-    if ($null -ne $number)      { Add-ValueNode -Context $Context -Cell $cell -Value $number }
-    elseif ($null -ne $boolean) { $cell.SetAttribute('t', 'b'); Add-ValueNode -Context $Context -Cell $cell -Value $boolean }
-    else                        { Add-InlineString -Context $Context -Cell $cell -Value $Value }
-    return ,$cell
-}
-
-function Add-ValueNode {
-    param([hashtable]$Context, $Cell, [string]$Value)
-    $v = New-XmlElement -Context $Context -Name 'v'
-    $v.InnerText = $Value
-    [void]$Cell.AppendChild($v)
-}
-
-function Add-InlineString {
-    param([hashtable]$Context, $Cell, [string]$Value)
-    $Cell.SetAttribute('t', 'inlineStr')
-    $is = New-XmlElement -Context $Context -Name 'is'
-    $t  = New-XmlElement -Context $Context -Name 't'
-    if ($Value -ne $Value.Trim()) { [void]$t.SetAttribute('space', $script:Ns.Xml, 'preserve') }
-    $t.InnerText = $Value
-    [void]$is.AppendChild($t)
-    [void]$Cell.AppendChild($is)
-}
-
-function New-XmlElement {
-    param([hashtable]$Context, [string]$Name)
-    return ,$Context.Document.CreateElement($Context.Prefix, $Name, $script:Ns.Main)
 }
 #endregion
 
-Export-ModuleMember -Function Remove-AbmTableRows, Write-AbmTableRows
+Export-ModuleMember -Function Reset-AbmSheetData, ConvertTo-AbmSheetRowsXml, Complete-AbmSheetXml

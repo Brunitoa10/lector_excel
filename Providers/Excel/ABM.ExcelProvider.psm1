@@ -11,22 +11,19 @@
 
 function Read-ExcelSheet {
     [CmdletBinding()]
-    param([Parameter(Mandatory)][string]$Path, [string]$SheetName)
+    param([Parameter(Mandatory)][string]$Path, [string]$SheetName, [scriptblock]$OnProgress)
 
     $zip = [System.IO.Compression.ZipFile]::OpenRead($Path)
     try {
         $info   = Get-AbmWorkbookInfo -Zip $zip
         $sheet  = Select-AbmSheet -Info $info -SheetName $SheetName
-        $doc    = Open-AbmZipXml -Zip $zip -EntryName $sheet.Part
-        if ($null -eq $doc) { throw "No se encontró la hoja '$($sheet.Name)' dentro del archivo." }
-
         $shared = Get-AbmSharedStrings -Zip $zip -Part $info.SharedStringsPart
         $dates  = Get-AbmDateStyleSet -Zip $zip -StylesPart $info.StylesPart
-        $rows   = Read-AbmSheetRows -Document $doc -Shared $shared -DateStyles $dates
-        $layout = Get-AbmSheetLayout -Rows $rows
+        $grid   = Read-AbmSheetGrid -Zip $zip -Part $sheet.Part -Shared $shared -DateStyles $dates -OnProgress $OnProgress
+        $layout = Get-AbmSheetLayout -Grid $grid
 
         return @{
-            Table = ConvertTo-AbmSheetTable -Rows $rows -Layout $layout
+            Table = ConvertTo-AbmSheetTable -Grid $grid -Layout $layout
             Meta  = @{
                 Sheets    = @($info.Sheets | ForEach-Object { $_.Name })
                 Sheet     = $sheet.Name
@@ -60,15 +57,16 @@ function Save-ExcelSheet {
         $sheetData = $doc.SelectSingleNode('/x:worksheet/x:sheetData', $ns)
         if ($null -eq $sheetData) { throw "La hoja '$($sheet.Name)' no tiene una estructura válida." }
 
-        $styles  = Remove-AbmTableRows -SheetData $sheetData -Ns $ns -HeaderRow $HeaderRow
-        $lastRow = Write-AbmTableRows -SheetData $sheetData -Table $Table -HeaderRow $HeaderRow -ColOffset $ColOffset `
-                       -Styles $styles -DateStyles (Get-AbmDateStyleSet -Zip $zip -StylesPart $info.StylesPart) `
-                       -DefaultHeaderStyle $DefaultHeaderStyle -DefaultDataStyle $DefaultDataStyle
+        $styles = Reset-AbmSheetData -SheetData $sheetData -Ns $ns -HeaderRow $HeaderRow
+        $rows   = ConvertTo-AbmSheetRowsXml -Table $Table -HeaderRow $HeaderRow -ColOffset $ColOffset -Prefix $sheetData.Prefix `
+                      -Styles $styles -DateStyles (Get-AbmDateStyleSet -Zip $zip -StylesPart $info.StylesPart) `
+                      -DefaultHeaderStyle $DefaultHeaderStyle -DefaultDataStyle $DefaultDataStyle
+        $lastRow = $rows.LastRow
 
         $first = ConvertTo-AbmColumnLetters $ColOffset
         $last  = ConvertTo-AbmColumnLetters ($ColOffset + [math]::Max(1, $Table.Columns.Count) - 1)
         Update-AbmSheetRanges -Document $doc -Ns $ns -FirstColumn $first -LastColumn $last -HeaderRow $HeaderRow -LastRow $lastRow
-        Save-AbmZipXml -Zip $zip -EntryName $sheet.Part -Document $doc
+        Save-AbmZipText -Zip $zip -EntryName $sheet.Part -Content (Complete-AbmSheetXml -Document $doc -RowsXml $rows.Xml)
 
         $tableRange = '{0}{1}:{2}{3}' -f $first, $HeaderRow, $last, [math]::Max($lastRow, $HeaderRow + 1)
         Update-AbmSheetTables -Zip $zip -SheetPart $sheet.Part -Range $tableRange

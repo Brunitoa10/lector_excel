@@ -6,7 +6,7 @@
 #>
 
 $script:Ui    = @{}
-$script:State = @{ Source = $null; Table = $null; View = $null; Dirty = $false }
+$script:State = @{ Source = $null; Table = $null; View = $null; Dirty = $false; Busy = $false }
 $script:Settings = @{ Config = $null; StartupPath = ''; AppTitle = 'ABM de Datos · Excel & TXT' }
 
 function Initialize-AbmContext {
@@ -18,6 +18,7 @@ function Initialize-AbmContext {
     $script:State.Table  = $null
     $script:State.View   = $null
     $script:State.Dirty  = $false
+    $script:State.Busy   = $false
     $script:Settings.Config      = $Config
     $script:Settings.StartupPath = $StartupPath
 }
@@ -30,7 +31,7 @@ function Get-AbmUi {
 }
 
 function Get-AbmState {
-    <# Estado de la sesión: Source (archivo abierto), Table, View (filtro/orden) y Dirty. #>
+    <# Estado de la sesión: Source (archivo abierto), Table, View (filtro/orden), Dirty y Busy. #>
     [CmdletBinding()]
     param()
     return $script:State

@@ -33,6 +33,7 @@ function New-AbmToolbarView {
     $flow.Controls.AddRange([System.Windows.Forms.Control[]]@(New-ToolbarItems))
 
     $panel.Controls.AddRange([System.Windows.Forms.Control[]]@($flow, $line))
+    (Get-AbmUi).Toolbar = $panel
     return $panel
 }
 

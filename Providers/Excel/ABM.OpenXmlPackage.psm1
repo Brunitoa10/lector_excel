@@ -61,8 +61,12 @@ function Save-AbmZipText {
     param(
         [Parameter(Mandatory)][System.IO.Compression.ZipArchive]$Zip,
         [Parameter(Mandatory)][string]$EntryName,
-        [Parameter(Mandatory)][string]$Content
+        [Parameter(Mandatory)][AllowEmptyString()][string]$Content
     )
+    if ($Zip.Mode -ne [System.IO.Compression.ZipArchiveMode]::Create) {
+        $existing = $Zip.GetEntry($EntryName)
+        if ($null -ne $existing) { $existing.Delete() }
+    }
     $stream = $Zip.CreateEntry($EntryName, [System.IO.Compression.CompressionLevel]::Optimal).Open()
     $writer = New-Object System.IO.StreamWriter($stream, (New-Object System.Text.UTF8Encoding($false)))
     try { $writer.Write($Content) } finally { $writer.Dispose() }

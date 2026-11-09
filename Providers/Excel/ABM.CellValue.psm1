@@ -82,15 +82,20 @@ function ConvertTo-AbmCellNumber {
     return $null
 }
 
-function ConvertTo-AbmStoredBoolean {
-    <# 'VERDADERO' -> '1', 'FALSO' -> '0', otro texto -> $null #>
-    [CmdletBinding()]
-    param([AllowEmptyString()][string]$Value)
-    if ($Value -ceq $script:TrueText)  { return '1' }
-    if ($Value -ceq $script:FalseText) { return '0' }
-    return $null
-}
 #endregion
+
+function Get-AbmCellCodec {
+    <# Reglas de conversión precompiladas, para bucles de alto volumen que no pueden llamar funciones por celda. #>
+    [CmdletBinding()]
+    param()
+    return [pscustomobject]@{
+        NumberPattern = $script:NumberPattern
+        DateFormats   = $script:DateFormats
+        Culture       = $script:Invariant
+        TrueText      = $script:TrueText
+        FalseText     = $script:FalseText
+    }
+}
 
 function ConvertTo-Double {
     param([string]$Text, [ref]$Result)
@@ -101,4 +106,4 @@ function ConvertTo-Double {
 }
 
 Export-ModuleMember -Function Format-AbmOADate, Format-AbmCellNumber, ConvertFrom-AbmStoredDate, ConvertTo-AbmBooleanText,
-                              ConvertTo-AbmCellNumber, ConvertTo-AbmStoredBoolean
+                              ConvertTo-AbmCellNumber, Get-AbmCellCodec

@@ -19,6 +19,10 @@ Está pensada para **entornos corporativos donde no se puede instalar nada**: us
 - **No necesita Excel instalado**: lee y escribe el formato OpenXML (ZIP + XML) directamente.
 - No instala módulos, no genera `.exe`, no usa `.bat` ni compila código C#.
 
+**Rendimiento**
+- Lectura en streaming (`XmlReader`) y escritura por bloques: pensado para archivos con decenas de miles de filas.
+- Barra de progreso con el conteo de filas leídas; la ventana se bloquea mientras trabaja para evitar operaciones superpuestas.
+
 **Excel (`.xlsx` / `.xlsm`)**
 - Detecta automáticamente la fila de encabezados, aunque haya títulos o subtítulos arriba.
 - Al guardar **conserva** los estilos de cada columna, las filas de título, los anchos, los paneles inmovilizados, el autofiltro, las tablas de Excel y el resto de las hojas.

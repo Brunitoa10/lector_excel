@@ -10,14 +10,14 @@ function Register-AbmDefaultProviders {
     param()
 
     Register-AbmProvider -Kind 'Excel' -Description 'Libro de Excel' -Extensions '.xlsx', '.xlsm' `
-        -Read   { param($FilePath, $Sheet) Read-ExcelSheet -Path $FilePath -SheetName $Sheet } `
+        -Read   { param($FilePath, $Sheet, $OnProgress) Read-ExcelSheet -Path $FilePath -SheetName $Sheet -OnProgress $OnProgress } `
         -Save   { param($Source, $Table)
                   Save-ExcelSheet -Path $Source.Path -SheetName $Source.Meta.Sheet -Table $Table `
                                   -HeaderRow $Source.Meta.HeaderRow -ColOffset $Source.Meta.ColOffset } `
         -Create { param($FilePath, $Table, $Options) New-ExcelWorkbook -Path $FilePath -SheetName $Options.SheetName -Table $Table }
 
     Register-AbmProvider -Kind 'Txt' -Description 'Archivo de texto' -Extensions '.txt' `
-        -Read   { param($FilePath, $Sheet) Read-TextSource -Path $FilePath } `
+        -Read   { param($FilePath, $Sheet, $OnProgress) Read-TextSource -Path $FilePath -OnProgress $OnProgress } `
         -Save   { param($Source, $Table)
                   Save-TextSource -Path $Source.Path -Table $Table -Delimiter $Source.Meta.Delimiter -Encoding $Source.Meta.Encoding } `
         -Create { param($FilePath, $Table, $Options)

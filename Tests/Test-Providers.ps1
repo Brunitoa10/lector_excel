@@ -80,12 +80,14 @@ try {
     Assert-Equal 'Hoja'                  'Equipos' $book.Meta.Sheet
     Assert-Equal 'Fila 1 (texto, ñ, bool)' '007|Notebook ñandú|1250.5|VERDADERO' (Get-RowText $book.Table 0)
     $book.Table.Rows[1]['Equipo'] = 'Monitor 24"'
+    $book.Table.Rows[0]['Equipo'] = '  Notebook <A&B> '
     [void]$book.Table.Rows.Add([object[]]@('SN3', 'Impresora', '99.9', 'VERDADERO'))
     Save-AbmSource -Source $book -Table $book.Table
     $book = Open-AbmSource -Path $xlsx
     Assert-Equal 'Excel guardado: registros' 3 $book.Table.Rows.Count
     Assert-Equal 'Excel guardado: modificación' 'SN2|Monitor 24"|300|FALSO' (Get-RowText $book.Table 1)
     Assert-Equal 'Excel guardado: alta'         'SN3|Impresora|99.9|VERDADERO' (Get-RowText $book.Table 2)
+    Assert-Equal 'Excel: espacios y < & >'      '  Notebook <A&B> ' $book.Table.Rows[0]['Equipo']
 
     $converted = Join-Path $work 'convertido.txt'
     New-AbmSource -Path $converted -Table $book.Table -Options @{ Delimiter = "`t" }

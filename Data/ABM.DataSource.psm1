@@ -4,7 +4,8 @@
     Fachada de acceso a datos + Registro de estrategias (Strategy / Registry / Facade).
 
     Cada proveedor (formato de archivo) se registra con tres operaciones:
-      Read   { param($Path, $Sheet)           -> @{ Table = <DataTable>; Meta = <hashtable> } }
+      Read   { param($Path, $Sheet, $OnProgress) -> @{ Table = <DataTable>; Meta = <hashtable> } }
+                                                   ($OnProgress: scriptblock opcional que recibe la cantidad de filas leídas)
       Save   { param($Source, $Table)         -> sobrescribe el archivo de origen }
       Create { param($Path, $Table, $Options) -> crea un archivo nuevo con el contenido de la tabla }
 
@@ -63,12 +64,12 @@ function Get-AbmFileFilter {
 
 function Open-AbmSource {
     [CmdletBinding()]
-    param([Parameter(Mandatory)][string]$Path, [string]$Sheet)
+    param([Parameter(Mandatory)][string]$Path, [string]$Sheet, [scriptblock]$OnProgress)
 
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { throw "No existe el archivo: $Path" }
     $fullPath = (Resolve-Path -LiteralPath $Path).ProviderPath
     $provider = Get-AbmProvider -Path $fullPath
-    $result   = & $provider.Read $fullPath $Sheet
+    $result   = & $provider.Read $fullPath $Sheet $OnProgress
 
     [pscustomobject]@{ Path = $fullPath; Kind = $provider.Kind; Meta = $result.Meta; Table = $result.Table }
 }

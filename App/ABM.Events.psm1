@@ -86,6 +86,7 @@ function Register-FormEvents {
     })
     $form.Add_FormClosing({
         param($s, $e)
+        if ((Get-AbmState).Busy) { $e.Cancel = $true; return }
         try { if (-not (Confirm-AbmPendingChanges)) { $e.Cancel = $true } }
         catch { $e.Cancel = $false }
     })

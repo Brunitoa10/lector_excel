@@ -1,8 +1,8 @@
 ﻿Set-StrictMode -Version Latest
 
 <#
-    Barra de estado: mensaje de la última acción, ayuda de atajos y usuario/equipo.
-    También expone el indicador de "trabajando" (cursor de espera).
+    Barra de estado: mensaje de la última acción, barra de progreso, ayuda de atajos y usuario/equipo.
+    También expone el modo "trabajando": cursor de espera, barra en movimiento y controles bloqueados.
 #>
 
 function New-AbmStatusView {
@@ -17,10 +17,19 @@ function New-AbmStatusView {
     $status.Spring    = $true
     $status.TextAlign = [System.Drawing.ContentAlignment]::MiddleLeft
 
+    $progress = New-Object System.Windows.Forms.ToolStripProgressBar
+    $progress.Style   = [System.Windows.Forms.ProgressBarStyle]::Marquee
+    $progress.MarqueeAnimationSpeed = 30
+    $progress.Width   = Get-AbmScaled 160
+    $progress.Visible = $false
+
     [void]$strip.Items.Add($status)
+    [void]$strip.Items.Add($progress)
     [void]$strip.Items.Add((New-StatusLabel -Text (Get-AbmShortcutHelp) -Color 'Muted'))
     [void]$strip.Items.Add((New-StatusLabel -Text "   $env:USERNAME @ $env:COMPUTERNAME" -Color 'Muted'))
-    (Get-AbmUi).StatusText = $status
+    $ui = Get-AbmUi
+    $ui.StatusText = $status
+    $ui.Progress   = $progress
     return $strip
 }
 
@@ -34,13 +43,16 @@ function Set-AbmBusy {
     [CmdletBinding()]
     param([Parameter(Mandatory)][bool]$Busy, [string]$Text = '')
 
-    if (-not $Busy) {
-        [System.Windows.Forms.Cursor]::Current = [System.Windows.Forms.Cursors]::Default
-        return
-    }
-    [System.Windows.Forms.Cursor]::Current = [System.Windows.Forms.Cursors]::WaitCursor
+    $ui = Get-AbmUi
+    (Get-AbmState).Busy  = $Busy
+    $ui.Progress.Visible = $Busy
+    $ui.Toolbar.Enabled  = -not $Busy
+    $ui.DataArea.Enabled = -not $Busy
+    $cursor = if ($Busy) { [System.Windows.Forms.Cursors]::WaitCursor } else { [System.Windows.Forms.Cursors]::Default }
+    [System.Windows.Forms.Cursor]::Current = $cursor
     if ($Text) { Set-AbmStatus $Text }
-    [System.Windows.Forms.Application]::DoEvents()
+    # Permite redibujar (barra en movimiento y contador) durante procesos largos.
+    if ($Busy) { [System.Windows.Forms.Application]::DoEvents() }
 }
 
 function New-StatusLabel {

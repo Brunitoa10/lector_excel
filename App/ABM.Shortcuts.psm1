@@ -21,6 +21,7 @@ function Invoke-AbmShortcut {
     [CmdletBinding()]
     param([Parameter(Mandatory)][System.Windows.Forms.KeyEventArgs]$KeyEvent)
 
+    if ((Get-AbmState).Busy) { return }
     foreach ($shortcut in $script:Shortcuts) {
         if (-not (Test-Shortcut -Shortcut $shortcut -KeyEvent $KeyEvent)) { continue }
         $KeyEvent.Handled = $true

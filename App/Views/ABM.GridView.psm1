@@ -22,6 +22,7 @@ function New-AbmGridView {
     $inner.Controls.AddRange([System.Windows.Forms.Control[]]@((New-DataGrid), (New-EmptyState), $separator, (New-GridBar)))
     $frame.Controls.Add($inner)
     $area.Controls.Add($frame)
+    (Get-AbmUi).DataArea = $area
     return $area
 }
 

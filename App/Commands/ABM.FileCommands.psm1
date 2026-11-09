@@ -12,7 +12,10 @@ function Open-AbmDocument {
     $form = (Get-AbmUi).Form
     try {
         Set-AbmBusy -Busy $true -Text ('Abriendo {0}…' -f [System.IO.Path]::GetFileName($Path))
-        $source = Open-AbmSource -Path $Path -Sheet $Sheet
+        $source = Open-AbmSource -Path $Path -Sheet $Sheet -OnProgress {
+            param($rows) Set-AbmBusy -Busy $true -Text ('Leyendo… {0:N0} filas' -f $rows)
+        }
+        Set-AbmBusy -Busy $true -Text 'Preparando la vista…'
         Set-AbmSource -Source $source
         $count = $source.Table.Rows.Count
         Write-AbmAudit -Action 'ABRIR' -Target (Get-AbmSourceLabel) -Detail ('{0} registros' -f $count)
