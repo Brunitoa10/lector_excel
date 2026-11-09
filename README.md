@@ -8,6 +8,7 @@ Está pensada para **entornos corporativos donde no se puede instalar nada**: us
 ![.NET Framework](https://img.shields.io/badge/.NET_Framework-4.5%2B-512BD4?logo=dotnet&logoColor=white)
 ![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?logo=windows&logoColor=white)
 ![Sin dependencias](https://img.shields.io/badge/dependencias-ninguna-success)
+![Licencia MIT](https://img.shields.io/badge/licencia-MIT-yellow)
 
 ---
 
@@ -190,6 +191,12 @@ Register-AbmProvider -Kind 'Csv' -Description 'Valores separados por comas' -Ext
 - Solo escribe el archivo que se edita y sus carpetas `Logs\` y `Backups\`.
 
 En equipos corporativos se recomienda que el área de Seguridad revise o firme el script antes de usarlo.
+
+---
+
+## 📄 Licencia
+
+Distribuido bajo la licencia **MIT**. Ver [`LICENSE`](LICENSE).
 
 ---
 
