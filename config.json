@@ -1,0 +1,8 @@
+{
+  "Auditoria": true,
+  "Backup": true,
+  "MaxBackupsPorArchivo": 10,
+  "CarpetaLogs": "Logs",
+  "CarpetaBackups": "Backups",
+  "DelimitadorTxtPorDefecto": ";"
+}
