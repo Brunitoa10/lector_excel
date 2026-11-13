@@ -40,8 +40,8 @@ function Set-AbmKpiCard {
     $Card.Value.Text   = $Value
     $Card.Caption.Text = $Caption
     if ($Color) {
-        $Card.Strip.BackColor = Get-AbmColor $Color
-        $Card.Value.ForeColor = Get-AbmColor $Color
+        Set-AbmThemeColor -Target $Card.Strip -Property BackColor -Role $Color
+        Set-AbmThemeColor -Target $Card.Value -Property ForeColor -Role $Color
     }
 }
 
@@ -51,12 +51,12 @@ function New-CardLabel {
     $label = New-Object System.Windows.Forms.Label
     $label.Text         = $Text
     $label.Font         = Get-AbmFont $Font
-    $label.ForeColor    = Get-AbmColor $Color
     $label.AutoSize     = $false
     $label.AutoEllipsis = $true
     $label.Dock         = [System.Windows.Forms.DockStyle]::Top
     $label.Height       = Get-AbmScaled $Height
     $label.TextAlign    = [System.Drawing.ContentAlignment]::MiddleLeft
+    Set-AbmThemeColor -Target $label -Property ForeColor -Role $Color
     return $label
 }
 

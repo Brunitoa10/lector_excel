@@ -10,8 +10,9 @@ function New-AbmStatusView {
     param()
 
     $strip = New-Object System.Windows.Forms.StatusStrip
-    $strip.BackColor  = Get-AbmColor 'Card'
     $strip.SizingGrip = $false
+    $strip.RenderMode = [System.Windows.Forms.ToolStripRenderMode]::System
+    Set-AbmThemeColor -Target $strip -Property BackColor -Role 'Card'
 
     $status = New-StatusLabel -Text 'Listo' -Color 'Text'
     $status.Spring    = $true
@@ -58,8 +59,8 @@ function Set-AbmBusy {
 function New-StatusLabel {
     param([string]$Text, [string]$Color)
     $label = New-Object System.Windows.Forms.ToolStripStatusLabel
-    $label.Text      = $Text
-    $label.ForeColor = Get-AbmColor $Color
+    $label.Text = $Text
+    Set-AbmThemeColor -Target $label -Property ForeColor -Role $Color
     return $label
 }
 

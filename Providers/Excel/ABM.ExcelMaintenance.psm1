@@ -20,9 +20,18 @@ function Update-AbmSheetRanges {
 }
 
 function Update-AbmSheetTables {
-    <# Ajusta el rango de la tabla de Excel si la hoja tiene exactamente una. #>
+    <#
+        Ajusta la tabla de Excel (ListObject) si la hoja tiene exactamente una: rango y, si cambiaron
+        las columnas, la lista de columnas (Excel exige que coincida con los encabezados).
+        -Columns: @{ Name; SourceIndex } en el orden actual.
+    #>
     [CmdletBinding()]
-    param([Parameter(Mandatory)][System.IO.Compression.ZipArchive]$Zip, [Parameter(Mandatory)][string]$SheetPart, [Parameter(Mandatory)][string]$Range)
+    param(
+        [Parameter(Mandatory)][System.IO.Compression.ZipArchive]$Zip,
+        [Parameter(Mandatory)][string]$SheetPart,
+        [Parameter(Mandatory)][string]$Range,
+        [AllowEmptyCollection()][object[]]$Columns = @()
+    )
 
     $relationships = Get-AbmRelationships -Zip $Zip -PartName $SheetPart
     $tables = @($relationships | Where-Object { $_.Type -like '*/table' -and $_.Part })
@@ -30,9 +39,13 @@ function Update-AbmSheetTables {
 
     $doc = Open-AbmZipXml -Zip $Zip -EntryName $tables[0].Part
     if ($null -eq $doc) { return }
+    $ns = New-AbmXmlNamespace $doc
     $doc.DocumentElement.SetAttribute('ref', $Range)
-    $autoFilter = $doc.SelectSingleNode('/x:table/x:autoFilter', (New-AbmXmlNamespace $doc))
+    $autoFilter = $doc.SelectSingleNode('/x:table/x:autoFilter', $ns)
     if ($null -ne $autoFilter) { $autoFilter.SetAttribute('ref', $Range) }
+    if ($Columns.Count -gt 0 -and (Update-TableColumns -Document $doc -Ns $ns -Columns $Columns) -and $null -ne $autoFilter) {
+        foreach ($filter in @($autoFilter.SelectNodes('x:filterColumn', $ns))) { [void]$autoFilter.RemoveChild($filter) }
+    }
     Save-AbmZipXml -Zip $Zip -EntryName $tables[0].Part -Document $doc
 }
 
@@ -48,6 +61,43 @@ function Remove-AbmCalcChain {
     if ($null -ne $entry) { $entry.Delete() }
     Remove-PartReference -Zip $Zip -EntryName (Get-AbmRelsPath $Info.Part) -Attribute 'Id' -Value $calc[0].Id
     Remove-PartReference -Zip $Zip -EntryName '[Content_Types].xml' -Attribute 'PartName' -Value ('/' + $calc[0].Part)
+}
+
+function Update-TableColumns {
+    <# Reconstruye <tableColumns> según las columnas actuales. Devuelve $true si hubo cambios. #>
+    param([System.Xml.XmlDocument]$Document, $Ns, [object[]]$Columns)
+
+    $container = $Document.SelectSingleNode('/x:table/x:tableColumns', $Ns)
+    if ($null -eq $container) { return $false }
+    $existing = @($container.SelectNodes('x:tableColumn', $Ns))
+    if (-not (Test-ColumnsChanged -Existing $existing -Columns $Columns)) { return $false }
+
+    $nextId = 0
+    foreach ($node in $existing) { $nextId = [math]::Max($nextId, [int]$node.GetAttribute('id')) }
+    foreach ($node in $existing) { [void]$container.RemoveChild($node) }
+    foreach ($column in $Columns) {
+        $source = $column.SourceIndex
+        if ($null -ne $source -and [int]$source -lt $existing.Count) { $node = $existing[[int]$source] }
+        else {
+            $nextId++
+            $node = $Document.CreateElement($container.Prefix, 'tableColumn', $Document.DocumentElement.NamespaceURI)
+            $node.SetAttribute('id', [string]$nextId)
+        }
+        $node.SetAttribute('name', $column.Name)
+        [void]$container.AppendChild($node)
+    }
+    $container.SetAttribute('count', [string]$Columns.Count)
+    return $true
+}
+
+function Test-ColumnsChanged {
+    param([object[]]$Existing, [object[]]$Columns)
+    if ($Existing.Count -ne $Columns.Count) { return $true }
+    for ($i = 0; $i -lt $Columns.Count; $i++) {
+        $source = $Columns[$i].SourceIndex
+        if ($null -eq $source -or [int]$source -ne $i -or $Existing[$i].GetAttribute('name') -cne $Columns[$i].Name) { return $true }
+    }
+    return $false
 }
 
 function Remove-PartReference {

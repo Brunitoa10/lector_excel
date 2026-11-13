@@ -1,6 +1,7 @@
 # Generados en tiempo de ejecución (pueden contener datos de usuarios y archivos de trabajo)
 Logs/
 Backups/
+preferencias.json
 
 # Archivos temporales de Office
 ~$*

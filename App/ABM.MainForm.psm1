@@ -10,8 +10,12 @@ function Show-AbmMainForm {
     param([Parameter(Mandatory)]$Config, [string]$InitialPath = '')
 
     Initialize-AbmContext -Config $Config -StartupPath $InitialPath
+    Initialize-AbmTheme
     $form = New-MainWindow
-    (Get-AbmUi).Form = $form
+    $ui = Get-AbmUi
+    $ui.Form = $form
+    $ui.Tips = New-Object System.Windows.Forms.ToolTip
+    New-AbmColumnMenu
 
     # Orden de agregado = orden inverso de acoplamiento (el último agregado queda en el borde).
     $form.Controls.AddRange([System.Windows.Forms.Control[]]@(
@@ -30,7 +34,7 @@ function New-MainWindow {
     $form.StartPosition = [System.Windows.Forms.FormStartPosition]::CenterScreen
     $form.Size          = New-Object System.Drawing.Size((Get-AbmScaled 1280), (Get-AbmScaled 800))
     $form.MinimumSize   = New-Object System.Drawing.Size((Get-AbmScaled 1040), (Get-AbmScaled 640))
-    $form.BackColor     = Get-AbmColor 'Surface'
+    Set-AbmThemeColor -Target $form -Property BackColor -Role 'Surface'
     $form.Font          = Get-AbmFont 'Body'
     $form.KeyPreview    = $true
     $form.AllowDrop     = $true

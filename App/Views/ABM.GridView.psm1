@@ -31,14 +31,11 @@ function New-GridBar {
     $bar.Width = Get-AbmScaled $script:DesignWidth
     $right = [System.Windows.Forms.AnchorStyles]'Top, Right'
 
-    $combo = New-Object System.Windows.Forms.ComboBox
-    $combo.DropDownStyle = [System.Windows.Forms.ComboBoxStyle]::DropDownList
-    $combo.FlatStyle     = [System.Windows.Forms.FlatStyle]::Flat
+    $combo = New-AbmComboBox
     $combo.Width         = Get-AbmScaled 220
     $combo.Location      = New-Object System.Drawing.Point((Get-AbmScaled 62), (Get-AbmScaled 15))
 
-    $search = New-Object System.Windows.Forms.TextBox
-    $search.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
+    $search = New-AbmTextBox
     $search.Width       = Get-AbmScaled 280
     $search.Location    = New-Object System.Drawing.Point(($bar.Width - (Get-AbmScaled 296)), (Get-AbmScaled 15))
     $search.Anchor      = $right
@@ -72,7 +69,7 @@ function New-EmptyState {
     $label.Dock      = [System.Windows.Forms.DockStyle]::Fill
     $label.TextAlign = [System.Drawing.ContentAlignment]::MiddleCenter
     $label.Font      = Get-AbmFont 'EmptyState'
-    $label.ForeColor = Get-AbmColor 'Muted'
+    Set-AbmThemeColor -Target $label -Property ForeColor -Role 'Muted'
     $label.AllowDrop = $true
     $label.Text      = "Abrí un archivo Excel o TXT para comenzar`r`n`r`nUsá «Abrir…», «Nuevo archivo» o arrastrá el archivo a esta ventana"
     (Get-AbmUi).EmptyLabel = $label

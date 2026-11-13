@@ -38,6 +38,9 @@ Está pensada para **entornos corporativos donde no se puede instalar nada**: us
 
 **Interfaz**
 - Encabezado corporativo, tarjetas de indicadores (registros, columnas, origen y estado) y grilla con filas alternadas.
+- **Edición directa en la grilla** (como en Excel): escribir sobre una celda, `F2` o doble clic. Cada cambio queda auditado.
+- **Administración de columnas**: agregar, renombrar o quitar columnas desde el botón *Columnas…* o con clic derecho sobre un encabezado. En Excel, cada columna conserva su formato aunque cambie de posición y la tabla de Excel se actualiza.
+- **Modo claro / oscuro** con un clic (o `Ctrl + T`); la preferencia se recuerda entre sesiones.
 - Búsqueda instantánea sobre todas las columnas y ordenamiento por columna.
 - Arrastrar y soltar archivos sobre la ventana.
 - **Nuevo archivo**: creás un Excel o un TXT definiendo sus columnas.
@@ -83,7 +86,9 @@ Get-ChildItem -Recurse | Unblock-File
 |------------------|-----------------------------------------|
 | `Ctrl + O`       | Abrir archivo                           |
 | `Ctrl + N`       | Alta de registro                        |
-| `F2` / doble clic | Modificar el registro seleccionado     |
+| `F2` / doble clic / escribir | Editar la celda en la grilla |
+| `Ctrl + E`       | Modificar el registro en el formulario  |
+| `Ctrl + T`       | Cambiar entre modo claro y oscuro       |
 | `Supr`           | Baja de los registros seleccionados     |
 | `Ctrl + S`       | Guardar                                 |
 | `Ctrl + Shift + S` | Guardar como (Excel o TXT)            |
@@ -134,7 +139,8 @@ lector_excel/
 ├── config.json                     # Configuración opcional
 ├── Core/                           # Transversal
 │   ├── ABM.Config.psm1             #   Configuración con valores por defecto
-│   └── ABM.Logger.psm1             #   Auditoría en .txt y respaldos con rotación
+│   ├── ABM.Logger.psm1             #   Auditoría en .txt y respaldos con rotación
+│   └── ABM.Preferences.psm1        #   Preferencias recordadas (tema) en preferencias.json
 ├── Data/                           # Modelo y acceso a datos
 │   ├── ABM.DataTable.psm1          #   Tabla en memoria, nombres únicos, registro <-> texto
 │   └── ABM.DataSource.psm1         #   Fachada + registro de estrategias
@@ -155,15 +161,16 @@ lector_excel/
 │       ├── ABM.ExcelTemplate.psm1  #     Libro nuevo con estilo corporativo
 │       └── ABM.ExcelProvider.psm1  #     Estrategia .xlsx / .xlsm (orquesta lo anterior)
 ├── UI/                             # Componentes visuales reutilizables
-│   ├── ABM.Theme.psm1              #   Paleta, tipografías y escala DPI
-│   ├── ABM.Controls.psm1           #   Fábrica de paneles, etiquetas y botones
+│   ├── ABM.Theme.psm1              #   Paletas Claro/Oscuro, tipografías, escala DPI y enlaces de color
+│   ├── ABM.Controls.psm1           #   Fábrica de paneles, etiquetas, botones y campos
 │   ├── ABM.KpiCard.psm1            #   Tarjeta de indicador
 │   ├── ABM.GridStyle.psm1          #   Estilo de la grilla
 │   └── Dialogs/
 │       ├── ABM.Messages.psm1       #     Mensajes y confirmaciones
 │       ├── ABM.DialogShell.psm1    #     Armazón común de diálogos
 │       ├── ABM.RecordDialog.psm1   #     Alta / modificación
-│       └── ABM.NewFileDialog.psm1  #     Nuevo archivo
+│       ├── ABM.NewFileDialog.psm1  #     Nuevo archivo
+│       └── ABM.ColumnDialog.psm1   #     Agregar / renombrar columna
 ├── App/                            # Aplicación
 │   ├── ABM.AppContext.psm1         #   Estado de la sesión y registro de controles
 │   ├── ABM.Session.psm1            #   Transiciones de estado y consultas
@@ -172,8 +179,8 @@ lector_excel/
 │   ├── ABM.Shortcuts.psm1          #   Atajos de teclado definidos como datos
 │   ├── ABM.Events.psm1             #   Conexión de eventos con comandos
 │   ├── ABM.MainForm.psm1           #   Ventana principal (sólo composición)
-│   ├── Views/                      #   Encabezado, barra de acciones, indicadores, grilla y estado
-│   └── Commands/                   #   Comandos de archivo, de guardado y de registros (ABM)
+│   ├── Views/                      #   Encabezado, barra de acciones, indicadores, grilla, estado y menú de columnas
+│   └── Commands/                   #   Archivo, guardado, registros (ABM), edición en celda, columnas y tema
 └── Tests/
     └── Test-Providers.ps1          # Pruebas automáticas de la capa de datos
 ```
@@ -204,6 +211,7 @@ flowchart TB
 | **Facade**         | `Open-AbmSource`, `Save-AbmSource` y `New-AbmSource`: la aplicación no conoce OpenXML ni delimitadores. |
 | **Composition Root** | `ABM.ps1` es el único lugar donde se cargan y conectan las piezas. |
 | **Command**        | Atajos de teclado definidos como datos (tecla + condición + acción) en `ABM.Shortcuts`. |
+| **Observer**       | Los controles se enlazan a roles de color; al cambiar de tema se reaplican sin reconstruir la ventana. |
 | **Template Method** | Todos los diálogos comparten el armazón de `ABM.DialogShell`. |
 | **Factory**        | `ABM.Controls` crea controles ya estilizados según el tema. |
 | **Single Responsibility** | Un módulo por responsabilidad; la ventana principal sólo compone vistas. |
@@ -231,7 +239,7 @@ La capa de datos tiene pruebas automáticas que **no requieren Pester ni ningún
 .\Tests\Test-Providers.ps1
 ```
 
-Crean archivos temporales y verifican lectura, alta, modificación, baja y guardado en Excel y TXT, la conversión entre formatos, la detección de codificación y delimitador, y el manejo de comillas, ceros a la izquierda y decimales. Devuelven código de salida `0` si todo pasó.
+Crean archivos temporales y verifican lectura, alta, modificación, baja y guardado en Excel y TXT, la conversión entre formatos, el agregado / renombrado / borrado de columnas (conservando el formato de cada una), la detección de codificación y delimitador, y el manejo de comillas, ceros a la izquierda y decimales. Devuelven código de salida `0` si todo pasó.
 
 ---
 

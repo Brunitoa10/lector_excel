@@ -69,10 +69,26 @@ function Save-ExcelSheet {
         Save-AbmZipText -Zip $zip -EntryName $sheet.Part -Content (Complete-AbmSheetXml -Document $doc -RowsXml $rows.Xml)
 
         $tableRange = '{0}{1}:{2}{3}' -f $first, $HeaderRow, $last, [math]::Max($lastRow, $HeaderRow + 1)
-        Update-AbmSheetTables -Zip $zip -SheetPart $sheet.Part -Range $tableRange
+        Update-AbmSheetTables -Zip $zip -SheetPart $sheet.Part -Range $tableRange -Columns (Get-ColumnDescriptors -Table $Table)
         Remove-AbmCalcChain -Zip $zip -Info $info
     }
     finally { $zip.Dispose() }
+    Reset-ColumnIdentity -Table $Table
+}
+
+function Get-ColumnDescriptors {
+    param([System.Data.DataTable]$Table)
+    $list = New-Object System.Collections.Generic.List[object]
+    foreach ($column in $Table.Columns) {
+        $list.Add([pscustomobject]@{ Name = $column.ColumnName; SourceIndex = $column.ExtendedProperties['AbmSourceIndex'] })
+    }
+    return ,$list.ToArray()
+}
+
+function Reset-ColumnIdentity {
+    <# Después de guardar, la posición actual de cada columna pasa a ser su posición "original" en el archivo. #>
+    param([System.Data.DataTable]$Table)
+    for ($i = 0; $i -lt $Table.Columns.Count; $i++) { $Table.Columns[$i].ExtendedProperties['AbmSourceIndex'] = $i }
 }
 
 function New-ExcelWorkbook {

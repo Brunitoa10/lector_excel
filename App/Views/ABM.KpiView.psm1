@@ -19,7 +19,7 @@ function New-AbmKpiView {
     $layout.Dock        = [System.Windows.Forms.DockStyle]::Top
     $layout.Height      = Get-AbmScaled 108
     $layout.Padding     = New-AbmPadding -Left 20 -Top 14 -Right 6 -Bottom 8
-    $layout.BackColor   = Get-AbmColor 'Surface'
+    Set-AbmThemeColor -Target $layout -Property BackColor -Role 'Surface'
     $layout.ColumnCount = $script:Cards.Count
     $layout.RowCount    = 1
     [void]$layout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))

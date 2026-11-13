@@ -46,9 +46,8 @@ function Add-RecordFields {
 
     $boxes = [ordered]@{}
     foreach ($column in $Columns) {
-        $box = New-Object System.Windows.Forms.TextBox
-        $box.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
-        if ($null -ne $Values -and $Values.Contains($column)) { $box.Text = [string]$Values[$column] }
+        $text = if ($null -ne $Values -and $Values.Contains($column)) { [string]$Values[$column] } else { '' }
+        $box  = New-AbmTextBox -Text $text
         Add-AbmDialogField -Shell $Shell -Caption $column -Control $box
         $boxes[$column] = $box
     }

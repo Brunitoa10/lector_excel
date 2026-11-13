@@ -24,13 +24,14 @@ function Update-AbmActions {
 
     $ui = Get-AbmUi
     $hasData  = Test-AbmHasData
-    $selected = if ($hasData) { $ui.Grid.SelectedRows.Count } else { 0 }
+    $selected = Get-AbmSelectedRowCount
 
     $ui.BtnAdd.Enabled    = $hasData
     $ui.BtnEdit.Enabled   = $selected -eq 1
     $ui.BtnDelete.Enabled = $selected -ge 1
     $ui.BtnSave.Enabled   = $hasData -and (Get-AbmState).Dirty
     $ui.BtnSaveAs.Enabled = $hasData
+    $ui.BtnColumns.Enabled = $hasData
     $ui.Search.Enabled    = $hasData
 }
 
@@ -89,7 +90,6 @@ function Select-AbmRow {
         if ($item -is [System.Data.DataRowView] -and [object]::ReferenceEquals($item.Row, $Row)) {
             $grid.ClearSelection()
             $grid.CurrentCell = $grid.Rows[$i].Cells[0]
-            $grid.Rows[$i].Selected = $true
             try { $grid.FirstDisplayedScrollingRowIndex = $i } catch { Write-Verbose 'Fila fuera del área visible.' }
             return
         }

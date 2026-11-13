@@ -5,11 +5,14 @@
     Los cambios quedan en memoria (estado "Pendiente") hasta que se guarda.
 #>
 
+$script:DetailedAuditLimit = 20   # más registros que esto: una sola línea de auditoría
+
 function Invoke-AbmAdd {
     [CmdletBinding()]
     param()
 
     if (-not (Test-AbmHasData)) { return }
+    Complete-AbmPendingEdit
     $values = Show-AbmRecordDialog -Owner (Get-AbmUi).Form -Title 'Alta de registro' `
         -Subtitle ('Nuevo registro en {0}' -f (Get-AbmSourceLabel)) -Columns (Get-AbmColumnNames)
     if ($null -eq $values) { return }
@@ -29,6 +32,7 @@ function Invoke-AbmEdit {
     [CmdletBinding()]
     param()
 
+    Complete-AbmPendingEdit
     $rows = @(Get-AbmSelectedRows)
     if ($rows.Count -eq 0) { return }
     if ($rows.Count -gt 1) {
@@ -54,15 +58,19 @@ function Invoke-AbmDelete {
     [CmdletBinding()]
     param()
 
+    Complete-AbmPendingEdit
     $rows = @(Get-AbmSelectedRows)
     if ($rows.Count -eq 0) { return }
     if (-not (Confirm-AbmAction -Owner (Get-AbmUi).Form -Title 'Confirmar baja' -Message (Get-DeleteQuestion -Count $rows.Count))) { return }
 
-    $table = (Get-AbmState).Table
+    $table    = (Get-AbmState).Table
+    $detailed = $rows.Count -le $script:DetailedAuditLimit
+    if (-not $detailed) {
+        Write-AbmAudit -Action 'BAJA' -Target (Get-AbmSourceLabel) -Detail ('{0:N0} registros (baja múltiple)' -f $rows.Count)
+    }
     foreach ($row in $rows) {
-        $detail = Format-AbmRecord -Record (ConvertTo-AbmRecord -Row $row)
+        if ($detailed) { Write-AbmAudit -Action 'BAJA' -Target (Get-AbmSourceLabel) -Detail (Format-AbmRecord -Record (ConvertTo-AbmRecord -Row $row)) }
         $table.Rows.Remove($row)
-        Write-AbmAudit -Action 'BAJA' -Target (Get-AbmSourceLabel) -Detail $detail
     }
     Set-AbmDirty
     Set-AbmStatus ('{0} registro(s) dado(s) de baja. Recordá guardar los cambios.' -f $rows.Count)

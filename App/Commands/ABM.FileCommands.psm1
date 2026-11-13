@@ -81,6 +81,7 @@ function Confirm-AbmPendingChanges {
     [OutputType([bool])]
     param()
 
+    Complete-AbmPendingEdit
     $state = Get-AbmState
     if (-not $state.Dirty) { return $true }
 

@@ -193,6 +193,8 @@ function ConvertTo-AbmSheetTable {
     }
     $table.EndLoadData()
     $table.AcceptChanges()
+    # Posición original de cada columna: permite conservar su estilo aunque se agreguen, muevan o quiten columnas.
+    for ($i = 0; $i -lt $table.Columns.Count; $i++) { $table.Columns[$i].ExtendedProperties['AbmSourceIndex'] = $i }
     return ,$table
 }
 

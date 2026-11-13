@@ -89,6 +89,19 @@ try {
     Assert-Equal 'Excel guardado: alta'         'SN3|Impresora|99.9|VERDADERO' (Get-RowText $book.Table 2)
     Assert-Equal 'Excel: espacios y < & >'      '  Notebook <A&B> ' $book.Table.Rows[0]['Equipo']
 
+    Write-Host 'Columnas' -ForegroundColor Cyan
+    Assert-Equal 'Nombre duplicado'   'Ya existe una columna llamada «serial».' (Test-AbmColumnName -Table $book.Table -Name 'serial')
+    Assert-Equal 'Renombrar a sí misma' '' (Test-AbmColumnName -Table $book.Table -Name 'Serial' -ExceptIndex 0)
+    Add-AbmTableColumn -Table $book.Table -Name 'Ubicación' -Position 1
+    Rename-AbmTableColumn -Table $book.Table -Index 3 -Name 'Precio USD'
+    Remove-AbmTableColumn -Table $book.Table -Index 4
+    $book.Table.Rows[0]['Ubicación'] = 'Rack 2'
+    Save-AbmSource -Source $book -Table $book.Table
+    $book = Open-AbmSource -Path $xlsx
+    Assert-Equal 'Excel: columnas nuevas' 'Serial|Ubicación|Equipo|Precio USD' ((@($book.Table.Columns | ForEach-Object ColumnName)) -join '|')
+    Assert-Equal 'Excel: datos por columna' '007|Rack 2|  Notebook <A&B> |1250.5' (Get-RowText $book.Table 0)
+    Assert-Equal 'Excel: columna nueva vacía' 'SN2||Monitor 24"|300' (Get-RowText $book.Table 1)
+
     $converted = Join-Path $work 'convertido.txt'
     New-AbmSource -Path $converted -Table $book.Table -Options @{ Delimiter = "`t" }
     Assert-Equal 'Excel -> TXT (tab)' "`t" (Open-AbmSource -Path $converted).Meta.Delimiter

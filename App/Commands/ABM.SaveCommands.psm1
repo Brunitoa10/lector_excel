@@ -12,6 +12,7 @@ function Invoke-AbmSave {
     [OutputType([bool])]
     param()
 
+    Complete-AbmPendingEdit
     $state  = Get-AbmState
     $source = $state.Source
     if ($null -eq $source) { return $false }
@@ -40,6 +41,7 @@ function Invoke-AbmSaveAs {
     [OutputType([bool])]
     param()
 
+    Complete-AbmPendingEdit
     $state  = Get-AbmState
     $source = $state.Source
     if ($null -eq $source) { return $false }

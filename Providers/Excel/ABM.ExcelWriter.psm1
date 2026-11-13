@@ -119,16 +119,23 @@ function Read-ColumnStyles {
 }
 
 function Get-ColumnLayout {
-    <# Precalcula por columna: letras, atributo de estilo del encabezado y de los datos, y si es fecha. #>
+    <# Precalcula por columna: letras, atributo de estilo del encabezado y de los datos, y si es fecha.
+       El estilo se busca por la posición ORIGINAL de la columna (AbmSourceIndex), no por la actual. #>
     param($Table, [int]$ColOffset, [hashtable]$Styles, $DateStyles, [string]$DefaultHeaderStyle, [string]$DefaultDataStyle)
 
+    # Columna nueva: encabezado con el estilo del primer encabezado existente y datos sin estilo propio.
+    $newHeader = if ($Styles.Header.ContainsKey($ColOffset)) { $Styles.Header[$ColOffset] } else { $DefaultHeaderStyle }
     $layout = New-Object System.Collections.Generic.List[object]
     for ($i = 0; $i -lt $Table.Columns.Count; $i++) {
-        $column = $ColOffset + $i
-        $header = if ($Styles.Header.ContainsKey($column)) { $Styles.Header[$column] } else { $DefaultHeaderStyle }
-        $data   = if ($Styles.Data.ContainsKey($column)) { $Styles.Data[$column] } else { $DefaultDataStyle }
+        $source = $Table.Columns[$i].ExtendedProperties['AbmSourceIndex']
+        if ($null -ne $source) {
+            $key    = $ColOffset + [int]$source
+            $header = if ($Styles.Header.ContainsKey($key)) { $Styles.Header[$key] } else { $DefaultHeaderStyle }
+            $data   = if ($Styles.Data.ContainsKey($key)) { $Styles.Data[$key] } else { $DefaultDataStyle }
+        }
+        else { $header = $newHeader; $data = $DefaultDataStyle }
         $layout.Add([pscustomobject]@{
-            Letters    = ConvertTo-AbmColumnLetters $column
+            Letters    = ConvertTo-AbmColumnLetters ($ColOffset + $i)
             HeaderAttr = Get-StyleAttribute $header
             DataAttr   = Get-StyleAttribute $data
             IsDate     = ($data -ne '') -and $DateStyles.Contains([int]$data)

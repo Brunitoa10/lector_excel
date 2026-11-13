@@ -8,7 +8,7 @@
       - No instala módulos, no genera .exe, no usa .bat ni código C# compilado.
 
     Capas (una carpeta por capa, un módulo por responsabilidad):
-      Core\       Configuración y trazabilidad (auditoría + respaldos).
+      Core\       Configuración, preferencias del usuario y trazabilidad (auditoría + respaldos).
       Data\       Tabla en memoria y fachada de acceso a datos (Strategy + Registry + Facade).
       Providers\  Estrategias por formato: Text\ (.txt) y Excel\ (.xlsx / .xlsm, OpenXML).
       UI\         Tema visual, controles reutilizables y diálogos.
@@ -34,7 +34,7 @@ try { [System.Windows.Forms.Application]::SetCompatibleTextRenderingDefault($fal
 
 # Orden de carga: cada módulo después de aquellos que usa al importarse.
 $modules = @(
-    'Core\ABM.Config', 'Core\ABM.Logger'
+    'Core\ABM.Config', 'Core\ABM.Logger', 'Core\ABM.Preferences'
     'Data\ABM.DataTable', 'Data\ABM.DataSource'
     'Providers\Text\ABM.TextEncoding', 'Providers\Text\ABM.DelimitedText', 'Providers\Text\ABM.TextProvider'
     'Providers\Excel\ABM.OpenXmlPackage', 'Providers\Excel\ABM.CellAddress', 'Providers\Excel\ABM.CellValue'
@@ -42,10 +42,11 @@ $modules = @(
     'Providers\Excel\ABM.ExcelMaintenance', 'Providers\Excel\ABM.ExcelTemplate', 'Providers\Excel\ABM.ExcelProvider'
     'Providers\ABM.ProviderSetup'
     'UI\ABM.Theme', 'UI\ABM.Controls', 'UI\ABM.KpiCard', 'UI\ABM.GridStyle'
-    'UI\Dialogs\ABM.Messages', 'UI\Dialogs\ABM.DialogShell', 'UI\Dialogs\ABM.RecordDialog', 'UI\Dialogs\ABM.NewFileDialog'
+    'UI\Dialogs\ABM.Messages', 'UI\Dialogs\ABM.DialogShell', 'UI\Dialogs\ABM.RecordDialog', 'UI\Dialogs\ABM.NewFileDialog', 'UI\Dialogs\ABM.ColumnDialog'
     'App\ABM.AppContext', 'App\ABM.Session', 'App\ABM.ViewUpdater', 'App\ABM.SearchFilter'
-    'App\Views\ABM.HeaderView', 'App\Views\ABM.ToolbarView', 'App\Views\ABM.KpiView', 'App\Views\ABM.GridView', 'App\Views\ABM.StatusView'
+    'App\Views\ABM.HeaderView', 'App\Views\ABM.ToolbarView', 'App\Views\ABM.KpiView', 'App\Views\ABM.GridView', 'App\Views\ABM.StatusView', 'App\Views\ABM.ColumnMenu'
     'App\Commands\ABM.FileCommands', 'App\Commands\ABM.SaveCommands', 'App\Commands\ABM.RecordCommands'
+    'App\Commands\ABM.CellEditCommands', 'App\Commands\ABM.ColumnCommands', 'App\Commands\ABM.ViewCommands'
     'App\ABM.Shortcuts', 'App\ABM.Events', 'App\ABM.MainForm'
 )
 foreach ($module in $modules) {
@@ -54,6 +55,7 @@ foreach ($module in $modules) {
 
 $config = Get-AbmConfig -Path (Join-Path $PSScriptRoot 'config.json')
 Initialize-AbmLogger -Root $PSScriptRoot -Config $config
+Initialize-AbmPreferences -Root $PSScriptRoot
 Register-AbmDefaultProviders
 
 $startupPath = ''

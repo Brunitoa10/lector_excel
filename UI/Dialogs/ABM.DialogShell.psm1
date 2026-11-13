@@ -54,9 +54,9 @@ function New-DialogForm {
     $form.MinimizeBox     = $false
     $form.ShowInTaskbar   = $false
     $form.StartPosition   = [System.Windows.Forms.FormStartPosition]::CenterParent
-    $form.BackColor       = Get-AbmColor 'Card'
     $form.Font            = Get-AbmFont 'Body'
     $form.ClientSize      = New-Object System.Drawing.Size((Get-AbmScaled $Width), (Get-AbmScaled $Height))
+    Set-AbmThemeColor -Target $form -Property BackColor -Role 'Card'
     return $form
 }
 
@@ -95,8 +95,8 @@ function New-DialogBody {
     $body.FlowDirection = [System.Windows.Forms.FlowDirection]::TopDown
     $body.WrapContents  = $false
     $body.AutoScroll    = $true
-    $body.BackColor     = Get-AbmColor 'Card'
     $body.Padding       = New-AbmPadding -Left 24 -Top 12 -Right 12 -Bottom 8
+    Set-AbmThemeColor -Target $body -Property BackColor -Role 'Card'
     return $body
 }
 #endregion

@@ -12,6 +12,7 @@ $script:Buttons = @(
     @{ Name = 'BtnAdd';    Text = '+  Alta';        Variant = 'Primary';   Width = 96;  Tip = 'Agregar un registro (Ctrl+N)' }
     @{ Name = 'BtnEdit';   Text = 'Modificar';      Variant = 'Secondary'; Width = 106; Tip = 'Modificar el registro seleccionado (F2 o doble clic)' }
     @{ Name = 'BtnDelete'; Text = 'Baja';           Variant = 'Danger';    Width = 90;  Tip = 'Dar de baja los registros seleccionados (Supr)' }
+    @{ Name = 'BtnColumns'; Text = 'Columnas…';     Variant = 'Secondary'; Width = 112; Tip = 'Agregar, renombrar o quitar columnas (también con clic derecho en el encabezado)' }
     @{ Separator = $true }
     @{ Name = 'BtnSave';   Text = 'Guardar';        Variant = 'Success';   Width = 104; Tip = 'Guardar los cambios en el archivo (Ctrl+S)' }
     @{ Name = 'BtnSaveAs'; Text = 'Guardar como…';  Variant = 'Secondary'; Width = 136; Tip = 'Guardar una copia en Excel o TXT (Ctrl+Shift+S)' }
@@ -29,7 +30,7 @@ function New-AbmToolbarView {
     $flow.Dock         = [System.Windows.Forms.DockStyle]::Fill
     $flow.WrapContents = $false
     $flow.Padding      = New-AbmPadding -Left 20 -Top 14
-    $flow.BackColor    = Get-AbmColor 'Card'
+    Set-AbmThemeColor -Target $flow -Property BackColor -Role 'Card'
     $flow.Controls.AddRange([System.Windows.Forms.Control[]]@(New-ToolbarItems))
 
     $panel.Controls.AddRange([System.Windows.Forms.Control[]]@($flow, $line))
@@ -39,7 +40,6 @@ function New-AbmToolbarView {
 
 function New-ToolbarItems {
     $ui = Get-AbmUi
-    $ui.Tips = New-Object System.Windows.Forms.ToolTip
     foreach ($spec in $script:Buttons) {
         if ($spec.ContainsKey('Separator')) { New-AbmSeparator; continue }
         $button = New-AbmButton -Text $spec.Text -Variant $spec.Variant -Width $spec.Width

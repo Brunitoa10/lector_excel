@@ -60,4 +60,52 @@ function Format-AbmRecord {
     return ($parts -join '; ')
 }
 
-Export-ModuleMember -Function Get-AbmUniqueNames, New-AbmDataTable, ConvertTo-AbmRecord, Format-AbmRecord
+#region Administración de columnas
+function Test-AbmColumnName {
+    <# Devuelve el mensaje de error, o '' si el nombre es válido. -ExceptIndex: columna que se está renombrando. #>
+    [CmdletBinding()]
+    [OutputType([string])]
+    param([Parameter(Mandatory)][System.Data.DataTable]$Table, [AllowEmptyString()][string]$Name, [int]$ExceptIndex = -1)
+
+    $clean = $Name.Trim()
+    if ($clean -eq '') { return 'Ingresá un nombre para la columna.' }
+    for ($i = 0; $i -lt $Table.Columns.Count; $i++) {
+        if ($i -ne $ExceptIndex -and $Table.Columns[$i].ColumnName -ieq $clean) { return ('Ya existe una columna llamada «{0}».' -f $clean) }
+    }
+    return ''
+}
+
+function Add-AbmTableColumn {
+    <# Agrega una columna de texto vacía en la posición indicada (0 = primera). #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][System.Data.DataTable]$Table, [Parameter(Mandatory)][string]$Name, [int]$Position = -1)
+
+    $problem = Test-AbmColumnName -Table $Table -Name $Name
+    if ($problem) { throw $problem }
+    $column = New-Object System.Data.DataColumn($Name.Trim(), [string])
+    $column.DefaultValue = ''
+    $Table.Columns.Add($column)
+    $last = $Table.Columns.Count - 1
+    if ($Position -ge 0 -and $Position -lt $last) { $column.SetOrdinal($Position) }
+}
+
+function Rename-AbmTableColumn {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][System.Data.DataTable]$Table, [Parameter(Mandatory)][int]$Index, [Parameter(Mandatory)][string]$Name)
+
+    $problem = Test-AbmColumnName -Table $Table -Name $Name -ExceptIndex $Index
+    if ($problem) { throw $problem }
+    $Table.Columns[$Index].ColumnName = $Name.Trim()
+}
+
+function Remove-AbmTableColumn {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][System.Data.DataTable]$Table, [Parameter(Mandatory)][int]$Index)
+
+    if ($Table.Columns.Count -le 1) { throw 'El archivo debe conservar al menos una columna.' }
+    $Table.Columns.RemoveAt($Index)
+}
+#endregion
+
+Export-ModuleMember -Function Get-AbmUniqueNames, New-AbmDataTable, ConvertTo-AbmRecord, Format-AbmRecord,
+                              Test-AbmColumnName, Add-AbmTableColumn, Rename-AbmTableColumn, Remove-AbmTableColumn

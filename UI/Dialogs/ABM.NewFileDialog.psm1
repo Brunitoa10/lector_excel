@@ -20,12 +20,13 @@ function Show-AbmNewFileDialog {
 
     $shell = New-AbmDialogShell -Title 'Nuevo archivo' -Subtitle 'Definí el formato y las columnas del archivo a crear' -BodyHeight 380
     $fields = @{
-        Format    = New-ComboField -Items $script:Formats -Selected 0
-        Sheet     = New-TextField -Text 'Datos' -MaxLength 31
-        Delimiter = New-ComboField -Items @($script:Delimiters | ForEach-Object { $_.Text }) -Selected (Get-DelimiterIndex $DefaultDelimiter)
-        Columns   = New-ColumnsField
+        Format    = New-AbmComboBox -Items $script:Formats -Selected 0
+        Sheet     = New-AbmTextBox -Text 'Datos' -MaxLength 31
+        Delimiter = New-AbmComboBox -Items @($script:Delimiters | ForEach-Object { $_.Text }) -Selected (Get-DelimiterIndex $DefaultDelimiter)
+        Columns   = New-AbmTextBox -Multiline
     }
     $fields.Delimiter.Enabled = $false
+    $fields.Columns.Height = Get-AbmScaled 150
 
     Add-AbmDialogField -Shell $shell -Caption 'Formato' -Control $fields.Format
     Add-AbmDialogField -Shell $shell -Caption 'Nombre de la hoja (Excel)' -Control $fields.Sheet
@@ -53,33 +54,6 @@ function Show-AbmNewFileDialog {
 }
 
 #region Campos
-function New-ComboField {
-    param([string[]]$Items, [int]$Selected)
-    $combo = New-Object System.Windows.Forms.ComboBox
-    $combo.DropDownStyle = [System.Windows.Forms.ComboBoxStyle]::DropDownList
-    [void]$combo.Items.AddRange([object[]]$Items)
-    $combo.SelectedIndex = $Selected
-    return $combo
-}
-
-function New-TextField {
-    param([string]$Text, [int]$MaxLength = 32767)
-    $box = New-Object System.Windows.Forms.TextBox
-    $box.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
-    $box.MaxLength   = $MaxLength
-    $box.Text        = $Text
-    return $box
-}
-
-function New-ColumnsField {
-    $box = New-TextField -Text ''
-    $box.Multiline     = $true
-    $box.AcceptsReturn = $true
-    $box.ScrollBars    = [System.Windows.Forms.ScrollBars]::Vertical
-    $box.Height        = Get-AbmScaled 150
-    return $box
-}
-
 function Get-DelimiterIndex {
     param([string]$Delimiter)
     for ($i = 0; $i -lt $script:Delimiters.Count; $i++) { if ($script:Delimiters[$i].Value -eq $Delimiter) { return $i } }

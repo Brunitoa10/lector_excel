@@ -11,6 +11,8 @@ function Register-AbmEvents {
 
     Register-ButtonEvents
     Register-GridEvents
+    Register-CellEditEvents
+    Register-ColumnEvents
     Register-SearchEvents
     Register-DragDropEvents
     Register-FormEvents
@@ -38,16 +40,50 @@ function Register-ButtonEvents {
     $ui.BtnDelete.Add_Click({ Invoke-AbmSafely { Invoke-AbmDelete } })
     $ui.BtnSave.Add_Click({   Invoke-AbmSafely { [void](Invoke-AbmSave) } })
     $ui.BtnSaveAs.Add_Click({ Invoke-AbmSafely { [void](Invoke-AbmSaveAs) } })
+    $ui.BtnTheme.Add_Click({  Invoke-AbmSafely { Invoke-AbmToggleTheme } })
 }
 
 function Register-GridEvents {
     $ui = Get-AbmUi
     $ui.SheetCombo.Add_SelectionChangeCommitted({ Invoke-AbmSafely { Invoke-AbmSheetChange } })
     $ui.Grid.Add_SelectionChanged({ Update-AbmActions })
-    $ui.Grid.Add_CellDoubleClick({
+}
+
+function Register-CellEditEvents {
+    <# Edición en la grilla: escribir, F2 o doble clic sobre una celda. #>
+    $grid = (Get-AbmUi).Grid
+    $grid.Add_CellDoubleClick({
         param($s, $e)
-        if ($e.RowIndex -ge 0) { Invoke-AbmSafely { Invoke-AbmEdit } }
+        if ($e.RowIndex -ge 0 -and $e.ColumnIndex -ge 0) { [void]$s.BeginEdit($true) }
     })
+    $grid.Add_CellBeginEdit({
+        param($s, $e)
+        Invoke-AbmSafely -Action { param($args1) Start-AbmCellEdit -EventArgs $args1 } -Argument $e
+    })
+    $grid.Add_CellEndEdit({ Invoke-AbmSafely { Complete-AbmCellEdit } })
+    $grid.Add_DataError({
+        param($s, $e)
+        $e.ThrowException = $false
+        Set-AbmStatus "Valor no válido: $($e.Exception.Message)"
+    })
+}
+
+function Register-ColumnEvents {
+    $ui = Get-AbmUi
+    $ui.BtnColumns.Add_Click({
+        $button = (Get-AbmUi).BtnColumns
+        $point  = $button.PointToScreen((New-Object System.Drawing.Point(0, $button.Height)))
+        Invoke-AbmSafely -Action { param($p) Show-AbmColumnMenu -ColumnIndex (Get-AbmCurrentColumnIndex) -ScreenPoint $p } -Argument $point
+    })
+    $ui.Grid.Add_ColumnHeaderMouseClick({
+        param($s, $e)
+        if ($e.Button -ne [System.Windows.Forms.MouseButtons]::Right) { return }
+        $index = ConvertTo-AbmTableColumnIndex -GridColumnIndex $e.ColumnIndex
+        Invoke-AbmSafely -Action { param($i) Show-AbmColumnMenu -ColumnIndex $i -ScreenPoint ([System.Windows.Forms.Cursor]::Position) } -Argument $index
+    })
+    $ui.MenuAddColumn.Add_Click({    Invoke-AbmSafely { Invoke-AbmAddColumn -ColumnIndex (Get-AbmUi).MenuColumn } })
+    $ui.MenuRenameColumn.Add_Click({ Invoke-AbmSafely { Invoke-AbmRenameColumn -ColumnIndex (Get-AbmUi).MenuColumn } })
+    $ui.MenuRemoveColumn.Add_Click({ Invoke-AbmSafely { Invoke-AbmRemoveColumn -ColumnIndex (Get-AbmUi).MenuColumn } })
 }
 
 function Register-SearchEvents {
