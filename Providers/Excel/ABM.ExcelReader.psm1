@@ -78,8 +78,8 @@ function Read-AbmSheetGrid {
                 $name = $reader.LocalName
                 if ($name -eq 'c') {
                     $ref = $reader.GetAttribute('r')
-                    if ($ref) {
-                        $letters = $ref.TrimEnd($script:RefDigits)
+                    $letters = if ($ref) { $ref.TrimEnd($script:RefDigits) } else { '' }
+                    if ($letters) {
                         if (-not $columnCache.TryGetValue($letters, [ref]$position)) {
                             $position = ConvertFrom-AbmColumnLetters $letters
                             $columnCache[$letters] = $position
@@ -108,7 +108,7 @@ function Read-AbmSheetGrid {
                 $inCell = $false
                 # --- valor visible de la celda (inline para evitar llamadas por celda) ---
                 if ($cellType -eq 'inlineStr')                 { $text = $inline.ToString() }
-                elseif ($null -eq $raw)                        { $text = '' }
+                elseif ([string]::IsNullOrEmpty($raw))         { $text = '' }   # <v></v>: celda vacía con formato
                 elseif ($cellType -eq 's')                     { $text = ''; if ([int]::TryParse($raw, [ref]$position) -and $position -lt $Shared.Length) { $text = $Shared[$position] } }
                 elseif ($cellType -eq 'b')                     { if ($raw -eq '1') { $text = $trueText } else { $text = $falseText } }
                 elseif ($cellType -eq 'str' -or $cellType -eq 'e') { $text = $raw }

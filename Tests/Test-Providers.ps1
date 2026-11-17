@@ -53,6 +53,8 @@ try {
     Assert-Equal 'Número con ruido'      '656.69' (Format-AbmCellNumber -Raw '656.6900000000001')
     Assert-Equal 'Código con cero'       ''       ([string](ConvertTo-AbmCellNumber -Value '007'))
     Assert-Equal 'Campo con delimitador' '"a;b"'  (Format-AbmDelimitedField -Value 'a;b' -Delimiter ';')
+    Assert-Equal 'Fecha vacía'           ''       ([string](ConvertFrom-AbmStoredDate -Raw ''))
+    Assert-Equal 'Número vacío'          ''       ([string](ConvertTo-AbmCellNumber -Value ''))
 
     Write-Host 'TXT' -ForegroundColor Cyan
     $txt = Join-Path $work 'datos.txt'

@@ -21,7 +21,10 @@ function Open-AbmDocument {
         Write-AbmAudit -Action 'ABRIR' -Target (Get-AbmSourceLabel) -Detail ('{0} registros' -f $count)
         Set-AbmStatus ('Archivo abierto: {0} · {1:N0} registros' -f (Get-AbmSourceLabel), $count)
     }
-    catch { Show-AbmError -Owner $form -Message "No se pudo abrir el archivo.`n$Path" -ErrorRecord $_ }
+    catch {
+        Show-AbmError -Owner $form -Message "No se pudo abrir el archivo.`n$Path" -ErrorRecord $_
+        Update-AbmSheetSelector   # el selector vuelve a la hoja que realmente se está mostrando
+    }
     finally { Set-AbmBusy -Busy $false }
 }
 

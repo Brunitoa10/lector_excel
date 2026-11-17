@@ -44,7 +44,7 @@ function Format-AbmCellNumber {
 function ConvertFrom-AbmStoredDate {
     <# Valor numérico de una celda con formato de fecha -> texto de fecha; $null si no es número. #>
     [CmdletBinding()]
-    param([Parameter(Mandatory)][string]$Raw)
+    param([Parameter(Mandatory)][AllowEmptyString()][string]$Raw)
     $number = 0.0
     if (ConvertTo-Double -Text $Raw -Result ([ref]$number)) { return (Format-AbmOADate -Value $number) }
     return $null
@@ -63,7 +63,9 @@ function ConvertTo-AbmBooleanText {
 function ConvertTo-AbmCellNumber {
     <# Devuelve el valor numérico en formato invariante, o $null si debe guardarse como texto. #>
     [CmdletBinding()]
-    param([Parameter(Mandatory)][string]$Value, [switch]$IsDateColumn)
+    param([Parameter(Mandatory)][AllowEmptyString()][string]$Value, [switch]$IsDateColumn)
+
+    if ($Value -eq '') { return $null }
 
     $number = 0.0
     if ($script:NumberPattern.IsMatch($Value) -and (ConvertTo-Double -Text $Value -Result ([ref]$number))) {
