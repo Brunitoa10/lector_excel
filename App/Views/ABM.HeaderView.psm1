@@ -16,8 +16,9 @@ function New-AbmHeaderView {
     $subtitle = New-AbmLabel -Text 'Alta, baja y modificación de registros · Excel (.xlsx) y texto (.txt)' `
                              -Font 'Subtitle' -Color 'HeaderMuted' -X 24 -Y 47
 
-    # El último control acoplado queda en el borde: el botón de tema va a la derecha del archivo.
-    $panel.Controls.AddRange([System.Windows.Forms.Control[]]@($accent, $file, (New-ThemeToggle), $title, $subtitle))
+    # Se acoplan en orden inverso al agregado: primero la línea dorada (ancho completo),
+    # después el botón de tema (borde derecho) y a su izquierda el archivo.
+    $panel.Controls.AddRange([System.Windows.Forms.Control[]]@($file, (New-ThemeToggle), $accent, $title, $subtitle))
     (Get-AbmUi).HeaderFile = $file
     return $panel
 }
